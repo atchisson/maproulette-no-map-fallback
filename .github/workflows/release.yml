@@ -1,0 +1,56 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "maproulette-no-map-fallback.user.js"
+      - ".github/workflows/release.yml"
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  SCRIPT: maproulette-no-map-fallback.user.js
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Check syntax
+        run: node --check "$SCRIPT"
+
+      - name: Read version
+        id: meta
+        run: |
+          version=$(sed -n 's|^// @version[[:space:]]*\(.*\)$|\1|p' "$SCRIPT" | tr -d '[:space:]')
+          if [ -z "$version" ]; then
+            echo "::error::@version not found in $SCRIPT"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Version: $version"
+
+      - name: Publish release
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          tag="v$VERSION"
+          if gh release view "$tag" > /dev/null 2>&1; then
+            echo "Release $tag already exists, nothing to do. Bump @version to publish."
+            exit 0
+          fi
+          gh release create "$tag" "$SCRIPT" \
+            --title "$tag" \
+            --generate-notes \
+            --target "$GITHUB_SHA"
