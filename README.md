@@ -21,6 +21,47 @@ enough to lose the layer you picked, even though the rest is loading fine.
 Trade-off: if a layer is really down, you will see missing tiles instead of an
 automatic switch. Change the layer manually in that case.
 
+## Bonus: one-click completion for every status
+
+MapRoulette's **Disable Task Confirmation Modal** user setting only skips the
+confirmation modal for **I fixed it!**. With this script, it also skips it for
+**Not an issue**, **Skip**, **Already fixed** and **Can't complete**, so these
+become one-click too (keyboard shortcuts included).
+
+As with **I fixed it!**, the modal is still shown when:
+
+- the setting is off,
+- the challenge or project requires confirmation,
+- you are submitting or disputing a revision after a review.
+
+## Bonus: keyboard shortcuts shown on the buttons
+
+MapRoulette has keyboard shortcuts for completing a task, but the buttons don't
+show them. The script adds the key next to each label:
+
+| Button           | Key |
+| ---------------- | --- |
+| I fixed it!      | `F` |
+| Not an issue     | `Q` |
+| Skip             | `W` |
+| Already fixed    | `X` |
+| Can't complete   | `D` |
+
+The keys only appear while the shortcuts are active. MapRoulette turns them off
+while an editor is open (edit mode).
+
+## Turning the bonus features on or off
+
+Both bonus features are on by default. Toggle them from the userscript
+manager's menu (click the Violentmonkey / Tampermonkey icon while on
+MapRoulette):
+
+- ✅ One-click completion for every status
+- ✅ Show keyboard shortcuts on buttons
+
+The change applies right away, without reloading the page, and is remembered.
+The map layer fix is always on.
+
 ## Install
 
 1. Install a userscript manager: [Tampermonkey](https://www.tampermonkey.net/)
