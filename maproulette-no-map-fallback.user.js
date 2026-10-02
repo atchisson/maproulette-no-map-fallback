@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         MapRoulette – no automatic map layer fallback
 // @namespace    https://github.com/atchisson/maproulette-no-map-fallback
-// @version      1.2.0
-// @description  Stops MapRoulette from replacing your chosen map layer with the default one as soon as a single tile fails (retries failed tiles instead), and makes "Disable Task Confirmation Modal" apply to every completion status, not only "I fixed it!"; shows the task completion keyboard shortcuts on their buttons.
+// @version      1.3.0
+// @description  Stops MapRoulette from replacing your chosen map layer with the default one as soon as a single tile fails (retries failed tiles instead), and makes "Disable Task Confirmation Modal" apply to every completion status, not only "I fixed it!"; shows the task completion keyboard shortcuts on their buttons; keeps ONE iD window open across tasks (with the companion iD script) so several tasks end up in a single changeset.
 // @author       atchisson
 // @license      MIT
 // @homepageURL  https://github.com/atchisson/maproulette-no-map-fallback
@@ -33,6 +33,7 @@
   const SETTINGS = [
     { key: "oneClickCompletion", label: "One-click completion for every status" },
     { key: "shortcutHints", label: "Show keyboard shortcuts on buttons" },
+    { key: "keepEditorWindow", label: "Keep one iD window across tasks (needs the iD script)" },
   ];
   const settings = {};
   for (const { key } of SETTINGS) settings[key] = GM_getValue(key, true);
@@ -266,6 +267,115 @@
   new MutationObserver(scheduleLabelShortcuts).observe(document, { childList: true, subtree: true });
 
   for (const setting of SETTINGS) registerToggle(setting);
+
+  // ---- One iD window for several tasks -----------------------------------
+  //
+  // MapRoulette opens iD with window.open() and, before each new task, closes the
+  // previous editor window (Editor.js: `editorWindowReference.close()`), so every task
+  // lands in a fresh tab and the edits of the previous one are lost from the session.
+  //
+  // With the companion iD userscript installed, the iD tab announces itself ready
+  // (postMessage). From then on, opening an iD URL does not open anything: the task's
+  // location (map, object, changeset comment/source) is sent to the existing tab, and
+  // MapRoulette gets a handle whose close() does nothing. Without the announcement,
+  // everything behaves exactly as before.
+  //
+  // The command is a message, not a URL fragment: what to do with it is decided by the
+  // iD side, so a change in iD's URL handling does not break anything here.
+  const OSM_ORIGIN = "https://www.openstreetmap.org";
+  const CHANNEL = "sb-osm";
+  let idWindow = null; // the real iD window we opened, if any
+  let idReady = false; // true once the iD script in that window has announced itself
+
+  // The command for an iD URL, or null if the URL is not an iD editor URL.
+  function idCommand(rawUrl) {
+    let url;
+    try {
+      url = new URL(String(rawUrl), page.location.href);
+    } catch (e) {
+      return null;
+    }
+    if (url.origin !== OSM_ORIGIN) return null;
+    const isEdit = /^\/edit\/?$/.test(url.pathname) && url.searchParams.get("editor") === "id";
+    if (!isEdit && !/^\/id\/?$/.test(url.pathname)) return null;
+
+    const hash = new URLSearchParams(url.hash.replace(/^#/, ""));
+    const command = { canal: CHANNEL, type: "aller" };
+    const [zoom, lat, lon] = (hash.get("map") || "").split("/").map(Number);
+    if ([zoom, lat, lon].every(Number.isFinite)) command.carte = { zoom, centre: [lon, lat] };
+    const ids = (hash.get("id") || "").split(",").filter((id) => /^[nwr]\d+$/.test(id));
+    if (ids.length) command.ids = ids;
+    if (hash.has("comment")) command.comment = hash.get("comment");
+    if (hash.has("source")) command.source = hash.get("source");
+    return command;
+  }
+
+  // What MapRoulette keeps as `editorWindowReference`. It only reads `closed` and calls
+  // close() (Editor.js); anything else is forwarded to the real window.
+  const editorHandle = new Proxy(
+    {},
+    {
+      get(_, prop) {
+        const w = idWindow;
+        if (prop === "closed") return !w || w.closed;
+        if (prop === "close") {
+          // Once the iD script is ready the window is kept: that is the whole point.
+          return () => {
+            if (!idReady && w && !w.closed) w.close();
+          };
+        }
+        if (!w) return undefined;
+        const value = w[prop];
+        return typeof value === "function" ? value.bind(w) : value;
+      },
+    },
+  );
+
+  function patchWindowOpen() {
+    const originalOpen = page.open;
+    if (typeof originalOpen !== "function" || originalOpen.__mrKeepEditorPatched) return;
+
+    page.addEventListener("message", (event) => {
+      const data = event.data;
+      if (
+        event.origin === OSM_ORIGIN &&
+        idWindow &&
+        event.source === idWindow &&
+        data &&
+        data.canal === CHANNEL &&
+        data.type === "pret"
+      ) {
+        idReady = true;
+        console.info("[MR no-fallback] iD window is ready: it will be reused across tasks");
+      }
+    });
+
+    page.open = function (url) {
+      const command = settings.keepEditorWindow ? idCommand(url) : null;
+      if (!command) return originalOpen.apply(this, arguments);
+
+      if (idWindow && !idWindow.closed && idReady) {
+        idWindow.postMessage(command, OSM_ORIGIN);
+        try {
+          idWindow.focus();
+        } catch (e) {
+          /* focus is a courtesy */
+        }
+        return editorHandle;
+      }
+
+      // First task, or the iD script is not there: the original behaviour, with the
+      // window remembered so that it can be reused once it announces itself.
+      const opened = originalOpen.apply(this, arguments);
+      if (!opened) return opened;
+      idWindow = opened;
+      idReady = false;
+      return editorHandle;
+    };
+    page.open.__mrKeepEditorPatched = true;
+  }
+
+  patchWindowOpen();
 
   // Patch as soon as Leaflet defines window.L (before the first map render).
   if (page.L) {
