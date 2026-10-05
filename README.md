@@ -50,44 +50,14 @@ show them. The script adds the key next to each label:
 The keys only appear while the shortcuts are active. MapRoulette turns them off
 while an editor is open (edit mode).
 
-## Bonus: one iD window for several tasks (one changeset)
-
-MapRoulette closes the iD window before opening the next task, so every task
-starts a fresh editor and your unsaved edits do not follow you. With the
-[slightly-better-osm-org](https://github.com/atchisson/slightly-better-osm-org)
-iD userscript installed as well, this script keeps **one** iD window open:
-
-- The first task opens iD as usual. When the iD script is loaded, it tells
-  MapRoulette it is ready (`postMessage`).
-- From then on, "Edit in iD" does not open a new window. The task's location
-  (map position, object, changeset comment and source) is sent to the open
-  window, which moves there. Your edits stay in the same session, so several
-  tasks, even from different challenges, end up in one changeset.
-- Close the iD window yourself when you are done: the next task then opens a
-  new one.
-
-Without the iD script (or with this option off), nothing changes: MapRoulette
-keeps its own behaviour. Toggle it from the userscript manager menu:
-
-- ✅ Keep one iD window across tasks (needs the iD script)
-
-Changeset comment and source are merged across tasks while edits are in
-progress: hashtags are deduplicated (case-insensitively), the text parts are
-joined with "; " and the sources with ";", all within OSM's 255-character limit
-(extra text is dropped from the end, a hashtag is never cut). When nothing is
-being edited (nothing changed yet, or the changeset was already uploaded), the
-next task starts a new changeset and replaces them instead. Tasks still have to
-be marked as fixed in MapRoulette one by one.
-
 ## Turning the bonus features on or off
 
-The bonus features are on by default. Toggle them from the userscript
+Both bonus features are on by default. Toggle them from the userscript
 manager's menu (click the Violentmonkey / Tampermonkey icon while on
 MapRoulette):
 
 - ✅ One-click completion for every status
 - ✅ Show keyboard shortcuts on buttons
-- ✅ Keep one iD window across tasks (needs the iD script)
 
 The change applies right away, without reloading the page, and is remembered.
 The map layer fix is always on.
@@ -101,6 +71,8 @@ The map layer fix is always on.
 3. Reload MapRoulette.
 
 The script updates itself from the latest GitHub release.
+
+To work on several tasks in a single iD changeset, see the iD script slightly-better-osm-org (v0.4.0+): it is the one that groups the tabs, this script takes no part in it.
 
 ## Releasing
 
