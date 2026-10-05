@@ -71,9 +71,13 @@ keeps its own behaviour. Toggle it from the userscript manager menu:
 
 - ✅ Keep one iD window across tasks (needs the iD script)
 
-Limits: the changeset comment and source are replaced by those of the last
-task, they are not merged; tasks still have to be marked as fixed in MapRoulette
-one by one.
+Changeset comment and source are merged across tasks while edits are in
+progress: hashtags are deduplicated (case-insensitively), the text parts are
+joined with "; " and the sources with ";", all within OSM's 255-character limit
+(extra text is dropped from the end, a hashtag is never cut). When nothing is
+being edited (nothing changed yet, or the changeset was already uploaded), the
+next task starts a new changeset and replaces them instead. Tasks still have to
+be marked as fixed in MapRoulette one by one.
 
 ## Turning the bonus features on or off
 

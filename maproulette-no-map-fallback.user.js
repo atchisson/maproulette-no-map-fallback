@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         MapRoulette – no automatic map layer fallback
 // @namespace    https://github.com/atchisson/maproulette-no-map-fallback
-// @version      1.3.0
+// @version      1.3.1
 // @description  Stops MapRoulette from replacing your chosen map layer with the default one as soon as a single tile fails (retries failed tiles instead), and makes "Disable Task Confirmation Modal" apply to every completion status, not only "I fixed it!"; shows the task completion keyboard shortcuts on their buttons; keeps ONE iD window open across tasks (with the companion iD script) so several tasks end up in a single changeset.
 // @author       atchisson
 // @license      MIT
@@ -286,6 +286,8 @@
   const CHANNEL = "sb-osm";
   let idWindow = null; // the real iD window we opened, if any
   let idReady = false; // true once the iD script in that window has announced itself
+  // The comment/source of the command that opened that window (see the "pret" handler).
+  let openingCommand = null;
 
   // The command for an iD URL, or null if the URL is not an iD editor URL.
   function idCommand(rawUrl) {
@@ -346,6 +348,20 @@
         data.type === "pret"
       ) {
         idReady = true;
+        // The first task's comment/source only live in the opening URL, and iD copies
+        // them into its settings only when the save panel opens. The iD script merges a
+        // new task's comment with what the settings hold, so without this the first
+        // task's comment would be lost from the merged changeset. Send it once, as a
+        // reduced command (no map/object: the URL already applied them). With no edit in
+        // progress yet, iD treats it as a replacement, which fills the settings.
+        const opening = openingCommand;
+        openingCommand = null;
+        if (opening && (opening.comment !== undefined || opening.source !== undefined)) {
+          const reduced = { canal: CHANNEL, type: "aller" };
+          if (opening.comment !== undefined) reduced.comment = opening.comment;
+          if (opening.source !== undefined) reduced.source = opening.source;
+          idWindow.postMessage(reduced, OSM_ORIGIN);
+        }
         console.info("[MR no-fallback] iD window is ready: it will be reused across tasks");
       }
     });
@@ -370,6 +386,7 @@
       if (!opened) return opened;
       idWindow = opened;
       idReady = false;
+      openingCommand = command;
       return editorHandle;
     };
     page.open.__mrKeepEditorPatched = true;
